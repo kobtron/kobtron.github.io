@@ -29,7 +29,7 @@
             padding: 4px;
          }
          
-         .name {
+         h2.name {
             border-style: solid;
             border-width: 0 0 1px 0;
             border-bottom-color: #d0d0d0;
@@ -45,6 +45,20 @@
          .whatsapp .number {
             font-weight: bold;
          }
+         
+         .lowest-price {
+            float: right;
+            border: 1px solid #d0d0d0;
+            background-color: #fafafa;
+            text-align: center;
+         }
+         
+         .clearfix::after { 
+            content: " ";
+            display: block; 
+            height: 0; 
+            clear: both;
+         }
       </style>
    </head>
    <body>
@@ -55,9 +69,18 @@
          <h2>Restaurantes cerca del aeropuerto de Cancún (CUN)</h2>
          <div class="item">
             <div class="info">
-               <h3 class="name">Los Cochys</h3>
-               <p>Carnitas, pozole, plato diario, etc...</p>
-               <div>Platillo más barato con bebida: <span><span class="price">$60.- MXN</span> (por persona)</span></div>
+               <h2 class="name">Los Cochys</h2>
+               <div class="clearfix">
+                  <div class="lowest-price">
+                     <div>Platillo más barato<br/>
+                     con bebida:</div>
+                     <div>
+                        <div class="price">$60.- MXN</div>
+                        <div>(por persona)</div>
+                     </div>
+                  </div>
+                  <p class="description">Carnitas, pozole, plato diario, bebidas, refrescos, etc...</p>
+               </div>
                <div class="whatsapp">WhatsApp: <span class="number">+52 998 235678</span></div>
                <div>
                   <h4>Comida</h4>
