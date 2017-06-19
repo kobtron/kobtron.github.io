@@ -94,3 +94,17 @@ h2.name {
    width: 150px;
    height: 150px;
 }
+
+.map {
+   position: relative;
+}
+
+.map a {
+   position: absolute;
+   top: 0;
+   left: 0;
+   display:inline-block;
+   width: 300px;
+   height: 250px;
+   z-index:5;
+}
