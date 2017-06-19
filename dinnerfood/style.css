@@ -108,3 +108,7 @@ h2.name {
    height: 250px;
    z-index:5;
 }
+
+.view-content {
+   display: inline-block;
+}
