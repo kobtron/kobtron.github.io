@@ -13,6 +13,8 @@
         </canvas>
     </body>
     <script>
+        const canvas = document.getElementById("game");
+
         class Coordinate {
             constructor(x, y) {
                 this.x = x;
@@ -178,10 +180,10 @@
             }
         }
 
-        class HittableRect extends Rectangle {
+        class Chest extends Rectangle {
             constructor(ctx, w, h) {
                 super(ctx, w, h);
-                this.fillStyle = "orange";
+                this.fillStyle = chestColor;
                 this.isClickable = true;
             }
 
@@ -203,6 +205,7 @@
         const idLen = 10;
         const symbolSize = 20;
         const coinSizeDefault = symbolSize;
+        const chestColor = "brown";
 
         class Symbol extends Label {
             constructor(ctx) {
@@ -213,7 +216,7 @@
         class ChestSymbol extends Symbol {
             constructor(ctx) {
                 super(ctx);
-                this.fillStyle = "brown";
+                this.fillStyle = chestColor;
             }
         }
 
@@ -250,15 +253,15 @@
             return Math.floor(Math.random() * max);
         }
 
-        class Chest extends Rectangle {
-            constructor(ctx, game) {
+        class ChestContainer extends Rectangle {
+            constructor(ctx, level) {
                 super(ctx, chestInnerW * 3, chestInnerH * 3);
 
-                this.game = game;
-                this.parent = game;
+                this.level = level;
+                this.parent = level;
                 var thisChest = this;
 
-                var innerRect = new HittableRect(ctx, chestInnerW, chestInnerH);
+                var innerRect = new Chest(ctx, chestInnerW, chestInnerH);
                 innerRect.setIdAndAddToParent("innerRect", this);
                 innerRect.x = chestInnerW;
                 innerRect.y = chestInnerH;
@@ -330,7 +333,7 @@
             removeCoin() {
                 if (this.coinsAmt > 0) {
                     this.coinsAmt--;
-                    this.game.coins++;
+                    this.level.coins++;
 
                     if (this.coinsAmt == 0) {
                         this.setNextChest();
@@ -340,7 +343,7 @@
 
             setNextChest() {
                 this.removeFromParent();
-                this.game.tryAddChest();
+                this.level.tryAddChest();
             }
         }
 
@@ -356,8 +359,8 @@
             return result;
         }
 
-        const chestGameDefaultWidth = 640;
-        const chestGameDefaultHeight = 360;
+        const chestGameDefaultWidth = canvas.width;
+        const chestGameDefaultHeight = canvas.height;
 
         class SymbolCounter extends Rectangle {
             constructor(ctx, symbol) {
@@ -372,26 +375,26 @@
             }
         }
 
-        class CoinsCounter extends SymbolCounter {
-            constructor(ctx, game) {
+        class LevelCoinCounter extends SymbolCounter {
+            constructor(ctx, level) {
                 super(ctx, new CoinSymbol(ctx));
-                this.game = game;
+                this.level = level;
             }
 
             update() {
-                this.label.text = "" + this.game.coins;
+                this.label.text = "" + this.level.coins;
                 super.update();
             }
         }
 
         class ChestCounter extends SymbolCounter {
-            constructor(ctx, game) {
+            constructor(ctx, level) {
                 super(ctx, new ChestSymbol(ctx));
-                this.game = game;
+                this.level = level;
             }
 
             update() {
-                this.label.text = "" + this.game.chests;
+                this.label.text = "" + this.level.chests;
                 super.update();
             }
         }
@@ -424,17 +427,19 @@
             }
         }
 
-        const chestsPerLevel = 20;
+        const chestsPerLevel = 3;
         const diagnostics = false;
         const chestsSecondsToGameSecondsRatio = 3 / 5;
 
-        class ChestGame extends Rectangle {
+        class ChestLevel extends Rectangle {
             coins = 0;
             chests = chestsPerLevel;
 
-            constructor(ctx) {
-                super(ctx, chestGameDefaultWidth, chestGameDefaultHeight);
+            constructor(ctx, w, h, game, level) {
+                super(ctx, w, h);
                 
+                this.game = game;
+                this.level = level;
                 var timeSeconds = (chestDefaultSeconds * chestsSecondsToGameSecondsRatio) * this.chests;
                 var time = new TimeLabel(ctx, timeSeconds * fps, symbolSize * 3, symbolSize);
                 time.setIdAndAddToParent("time", this);
@@ -446,23 +451,18 @@
                 chestCounter.x = (1/3) * this.w;
                 this.chestCounter = chestCounter;
 
-                var coinsCounter = new CoinsCounter(ctx, this);
-                coinsCounter.setIdAndAddToParent("coinsCounter", this);
-                coinsCounter.x = (2/3) * this.w;
+                var coinCounter = new LevelCoinCounter(ctx, this);
+                coinCounter.setIdAndAddToParent("coinCounter", this);
+                coinCounter.x = (2/3) * this.w;
 
                 this.isClickable = true;
-
-                if (diagnostics) {
-                    var diagnostics = new DiagnosticsHud(ctx, this);
-                    diagnostics.setIdAndAddToParent("diagnostics", this);
-                }
 
                 this.tryAddChest();
             }
 
             tryAddChest() {
                 if (this.chests > 0) {
-                    var chest = new Chest(ctx, this);
+                    var chest = new ChestContainer(ctx, this);
                     chest.setIdAndAddToParent("chest", this);
                     chest.x = getRandomInt(chestGameDefaultWidth - chest.w);
                     chest.y = getRandomInt(chestGameDefaultHeight - chest.h);
@@ -472,19 +472,146 @@
                         this.chestCounter.removeFromParent();
                     }
                 } else {
+                    var state = this.game.state;
+                    state.coins += this.coins;
+                    if (this.level >= state.level) {
+                        state.level = this.level + 1;
+                    }
+                    this.game.goToLevelSelectionScreen();
+                }
+            }
+        }
 
+        const levelSelectorSize = 40;
+
+        class LevelSelector extends Label {
+            constructor(ctx, level, game) {
+                super(ctx, levelSelectorSize, levelSelectorSize);
+                this.fillStyle = "orange";
+                this.text = "" + level;
+                this.level = level;
+                this.game = game;
+                this.isClickable = true;
+            }
+
+            mousedown(x, y, e) {
+                this.game.goToLevel(this.level);
+                super.mousedown(x, y, e);
+            }
+        }
+
+        class LevelSelectionScreen extends Rectangle {
+            constructor(ctx, w, h, game) {
+                super(ctx, w, h);
+                this.game = game;
+
+                var level1 = new LevelSelector(ctx, this.game.state.level, this.game);
+                level1.setIdAndAddToParent("level-1", this);
+                level1.x = (this.w / 2) - (level1.w / 2);
+                level1.y = (this.h / 2) - (level1.h/ 2);
+
+                this.isClickable = true;
+            }
+        }
+
+        class CoinCounter extends SymbolCounter {
+            constructor(ctx, state) {
+                super(ctx, new CoinSymbol(ctx));
+                this.state = state;
+            }
+
+            update() {
+                this.label.text = "" + this.state.coins;
+                super.update();
+            }
+        }
+
+        class ChestGame extends Rectangle {
+            constructor(ctx, state) {
+                super(ctx, chestGameDefaultWidth, chestGameDefaultHeight)
+                this.state = state;
+
+                var coinCounter = new CoinCounter(ctx, this.state);
+                coinCounter.x = this.w / 3;
+                coinCounter.y = this.h - symbolSize;
+                this.coinCounter = coinCounter;
+
+                this.goToLevelSelectionScreen();
+
+                if (diagnostics) {
+                    var diagnostics = new DiagnosticsHud(ctx, this);
+                    this.diagnostics = diagnostics;
+                }
+
+                this.isClickable = true;
+            }
+
+            removeCurrentScreen() {
+                if (this.currentScreen) {
+                    delete this.currentScreen;
+                }
+            }
+
+            goToLevelSelectionScreen() {
+                this.removeCurrentScreen();
+                var levelSelectionScreen = new LevelSelectionScreen(ctx, this.w, this.h, this);
+                this.currentScreen = levelSelectionScreen;
+            }
+
+            goToLevel(level) {
+                this.removeCurrentScreen();
+                var chestLevel = new ChestLevel(ctx, this.w, this.h, this, level);
+                this.currentScreen = chestLevel;
+            }
+
+            update() {
+                if (this.currentScreen) {
+                    this.currentScreen.update();
+                }
+
+                this.coinCounter.update();
+
+                if (this.diagnostics) {
+                    this.diagnostics.update();
                 }
             }
 
             draw() {
                 ctx.clearRect(0, 0, this.w, this.h);
-                super.draw();
+
+                if (this.currentScreen) {
+                    this.currentScreen.draw();
+                }
+
+                this.coinCounter.draw();
+
+                if (this.diagnostics) {
+                    this.diagnostics.draw();
+                }
+            }
+
+            mousedown(x, y, e) {
+                if (this.currentScreen) {
+                    this.currentScreen.mousedown(x, y, e);
+                }
+
+                if (this.diagnostics) {
+                    this.diagnostics.mousedown(x, y, e);
+                }
             }
         }
 
-        const canvas = document.getElementById("game");
+        class GameState {
+            #coins = 0;
+            get coins() { return this.#coins; }
+            set coins(value) { this.#coins = value; }
+            #level = 1;
+            get level() { return this.#level; }
+            set level(value) { this.#level = value; }
+        }
+
         const ctx = canvas.getContext("2d");
-        var game = new ChestGame(ctx);
+        var game = new ChestGame(ctx, new GameState());
         var clickEvents = [];
 
         function getMousePos(evt) {
