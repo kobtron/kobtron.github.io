@@ -434,9 +434,12 @@
         class ChestLevel extends Rectangle {
             coins = 0;
             chests = chestsPerLevel;
+            lost = false;
+            won = false;
 
             constructor(ctx, w, h, game, level) {
                 super(ctx, w, h);
+                var thisLevel = this;
                 
                 this.game = game;
                 this.level = level;
@@ -445,6 +448,10 @@
                 time.setIdAndAddToParent("time", this);
                 time.x = (0/3) * this.w;
                 this.time = time;
+
+                time.onFinish = function() {
+                    thisLevel.lose();
+                };
 
                 var chestCounter = new ChestCounter(ctx, this);
                 chestCounter.setIdAndAddToParent("chestCounter", this);
@@ -460,6 +467,26 @@
                 this.tryAddChest();
             }
 
+            lose() {
+                this.lost = true;
+                this.game.goToLevelSelectionScreen();
+            }
+
+            win() {
+                if (this.lost) {
+                    return;
+                }
+
+                var state = this.game.state;
+                state.coins += this.coins;
+
+                if (this.level >= state.level) {
+                    state.level = this.level + 1;
+                }
+
+                this.game.goToLevelSelectionScreen();
+            }
+
             tryAddChest() {
                 if (this.chests > 0) {
                     var chest = new ChestContainer(ctx, this);
@@ -472,12 +499,7 @@
                         this.chestCounter.removeFromParent();
                     }
                 } else {
-                    var state = this.game.state;
-                    state.coins += this.coins;
-                    if (this.level >= state.level) {
-                        state.level = this.level + 1;
-                    }
-                    this.game.goToLevelSelectionScreen();
+                    this.win();
                 }
             }
         }
