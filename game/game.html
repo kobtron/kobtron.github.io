@@ -99,17 +99,17 @@
                     this.y <= rect.y + rect.h && rect.y <= this.y + this.h;
             }
 
-            tryClick(x, y, e) {
+            tryMousedown(x, y, e) {
                 if (this.isClickable && this.isInside(x, y)) {
-                    this.click(x, y, e);
+                    this.mousedown(x, y, e);
                 }
             }
 
-            click(x, y, e) {
+            mousedown(x, y, e) {
                 for (var o in this.displayList) {
                     if (this.displayList.hasOwnProperty(o)) {
                         var el = this.displayList[o];
-                        el.tryClick(x, y, e);
+                        el.tryMousedown(x, y, e);
                     }
                 }
             }
@@ -185,11 +185,11 @@
                 this.isClickable = true;
             }
 
-            click(x, y, e) {
-                super.click(x, y, e);
+            mousedown(x, y, e) {
+                super.mousedown(x, y, e);
 
-                if (this.onClick) {
-                    this.onClick(x, y, e);
+                if (this.onMousedown) {
+                    this.onMousedown(x, y, e);
                 }
             }
         }
@@ -234,8 +234,8 @@
                 this.text = "" + this.value;
             }
 
-            click(x, y, e) {
-                super.click(x, y, e);
+            mousedown(x, y, e) {
+                super.mousedown(x, y, e);
                 this.grab();
             }
 
@@ -284,7 +284,7 @@
                 this.alpha = 0;
                 this.isClickable = true;
 
-                innerRect.onClick = function(x, y, e) {
+                innerRect.onMousedown = function(x, y, e) {
                     life.reduce();
                 };
 
@@ -418,7 +418,7 @@
                 this.alpha = 0.0;
             }
 
-            click(x, y, e) {
+            mousedown(x, y, e) {
                 this.clickX.text = "x: " + x;
                 this.clickY.text = "y: " + y;
             }
@@ -503,7 +503,7 @@
             for (var i = 0; i < clickEventsList.length; ++i) {
                 var e = clickEventsList[i];
                 var pos = getMousePos(e);
-                game.click(pos.x, pos.y, e);
+                game.mousedown(pos.x, pos.y, e);
             }
 
             game.update();
@@ -514,7 +514,7 @@
             setTimeout(loop, wait < 0 ? 0 : wait);
         }
 
-        canvas.addEventListener("click", function(e) {
+        canvas.addEventListener("mousedown", function(e) {
             clickEvents.push(e);
         });
 
