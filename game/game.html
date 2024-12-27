@@ -204,7 +204,7 @@
         const chestDefaultLife = 5;
         const idLen = 10;
         const symbolSize = 20;
-        const coinSizeDefault = symbolSize;
+        const coinSizeDefault = 30;
         const chestColor = "brown";
 
         class Symbol extends Label {
@@ -220,21 +220,26 @@
             }
         }
 
+        const coinColor = "yellow";
+        const coinTextFillStyle = "brown";
+
         class CoinSymbol extends Symbol {
             constructor(ctx) {
                 super(ctx);
-                this.fillStyle = "yellow";
-                this.textFillStyle = "brown";
+                this.fillStyle = coinColor;
+                this.textFillStyle = coinTextFillStyle;
             }
         }
 
-        class Coin extends CoinSymbol {
+        class Coin extends Label {
             constructor(ctx, value, chest) {
-                super(ctx);
+                super(ctx, coinSizeDefault, coinSizeDefault);
                 this.isClickable = true;
                 this.value = value;
                 this.chest = chest;
                 this.text = "" + this.value;
+                this.fillStyle = coinColor;
+                this.textFillStyle = coinTextFillStyle;
             }
 
             mousedown(x, y, e) {
@@ -300,13 +305,11 @@
                 this.life.removeFromParent();
                 this.innerRect.removeFromParent();
 
-                const coinsMinAmt = 2;
-                const coinsMaxExtra = 2;
-                var coinsAmt = coinsMinAmt + getRandomInt(coinsMaxExtra + 1);
+                var coinsAmt = 3;
                 this.coinsAmt = coinsAmt;
                 this.coins = {};
 
-                for (var i = 0; i < coinsAmt; ++i) {
+                for (var i = 0; i < this.coinsAmt; ++i) {
                     var coin = new Coin(ctx, 1, this);
                     coin.setIdAndAddToParent("coin-" + i, this);
                     var collides;
@@ -427,7 +430,7 @@
             }
         }
 
-        const chestsPerLevel = 3;
+        const chestsPerLevel = 4;
         const diagnostics = false;
         const chestsSecondsToGameSecondsRatio = 3 / 5;
 
