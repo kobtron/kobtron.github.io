@@ -1,0 +1,518 @@
+<html>
+    <head>
+        <title>Game</title>
+    </head>
+    <body>
+        <canvas id="game" width="640" height="360" style="border: 1px solid black;">
+
+        </canvas>
+    </body>
+    <script>
+        class Coordinate {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+        }
+
+        class Rectangle {
+            displayList = {};
+
+            constructor(ctx, w, h) {
+                this.ctx = ctx;
+                this.x = 0;
+                this.y = 0;
+                this.w = w;
+                this.h = h;
+                this.fillStyle = "black";
+                this.alpha = 1.0;
+                this.isClickable = false;
+            }
+
+            getRealCoords() {
+                var off = new Coordinate(0, 0);
+                var rect = this;
+                while (rect) {
+                    off.x += rect.x;
+                    off.y += rect.y;
+                    rect = rect.parent;
+                }
+                return off;
+            }
+
+            update() {
+                for (var o in this.displayList) {
+                    if (this.displayList.hasOwnProperty(o)) {
+                        this.displayList[o].update();
+                    }
+                }
+            }
+
+            setIdAndAddToParent(id, parent) {
+                this.id = id;
+                this.parent = parent;
+                this.addToParent();
+            }
+
+            addToParent() {
+                if (!this.hasOwnProperty("id")) {
+                    throw "Rectangle has no id!";
+                }
+
+                this.parent.displayList[this.id] = this;
+            }
+
+            removeFromParent() {
+                if (!this.hasOwnProperty("id")) {
+                    throw "Rectangle has no id!";
+                }
+
+                delete this.parent.displayList[this.id];
+            }
+
+            draw() {
+                var ctx = this.ctx;
+                ctx.fillStyle = this.fillStyle;
+                ctx.globalAlpha = this.alpha;
+                var coords = this.getRealCoords();
+                ctx.fillRect(coords.x, coords.y, this.w, this.h);
+
+                for (var o in this.displayList) {
+                    if (this.displayList.hasOwnProperty(o)) {
+                        this.displayList[o].draw();
+                    }
+                }
+            }
+            
+            isInside(x, y) {
+                var coords = this.getRealCoords();
+                return coords.x <= x && x <= coords.x + this.w && coords.y <= y && y <= coords.y + this.h;
+            }
+
+            collides(rect) {
+                return this.x <= rect.x + rect.w && rect.x <= this.x + this.w &&
+                    this.y <= rect.y + rect.h && rect.y <= this.y + this.h;
+            }
+
+            tryClick(x, y, e) {
+                if (this.isClickable && this.isInside(x, y)) {
+                    this.click(x, y, e);
+                }
+            }
+
+            click(x, y, e) {
+                for (var o in this.displayList) {
+                    if (this.displayList.hasOwnProperty(o)) {
+                        var el = this.displayList[o];
+                        el.tryClick(x, y, e);
+                    }
+                }
+            }
+        }
+
+        class Label extends Rectangle {
+            constructor(ctx, w, h) {
+                super(ctx, w, h);
+                this.fillStyle = "white";
+                this.textFillStyle = "black";
+                this.text = ""
+            }
+
+            draw() {
+                super.draw();
+
+                ctx.fillStyle = this.textFillStyle;
+                ctx.font = this.h + "px Arial";
+                var coords = this.getRealCoords();
+                ctx.fillText(this.text, coords.x, coords.y + this.h);
+            }
+        }
+
+        class LifeLabel extends Label {
+            constructor(ctx, value, w, h) {
+                super(ctx, w, h);
+                this.value = value;
+                this.fillStyle = "red";
+                this.textFillStyle = "white";
+            }
+
+            update() {
+                this.text = "" + this.value;
+                super.update();
+            }
+
+            reduce() {
+                if (this.value > 0) {
+                    this.value--;
+
+                    if (this.value == 0 && this.onFinish) {
+                        this.onFinish();
+                    }
+                }
+            }
+        }
+
+        class TimeLabel extends Label {
+            constructor(ctx, value, w, h) {
+                super(ctx, w, h);
+                this.value = value;
+                this.fillStyle = "blue";
+                this.textFillStyle = "white";
+            }
+
+            update() {
+                this.text = "" + Math.floor(this.value / fps);
+                if (this.value > 0) {
+                    this.value--;
+
+                    if (this.value == 0 && this.onFinish) {
+                        this.onFinish();
+                    }
+                }
+                super.update();
+            }
+        }
+
+        class HittableRect extends Rectangle {
+            constructor(ctx, w, h) {
+                super(ctx, w, h);
+                this.fillStyle = "orange";
+                this.isClickable = true;
+            }
+
+            click(x, y, e) {
+                super.click(x, y, e);
+
+                if (this.onClick) {
+                    this.onClick(x, y, e);
+                }
+            }
+        }
+
+        const fps = 60;
+        const msPerFrame = Math.round(1000 / fps);
+        const chestInnerW = 40;
+        const chestInnerH = 40;
+        const chestDefaultSeconds = 10;
+        const chestDefaultLife = 5;
+        const idLen = 10;
+        const symbolSize = 20;
+        const coinSizeDefault = symbolSize;
+
+        class Symbol extends Label {
+            constructor(ctx) {
+                super(ctx, symbolSize, symbolSize);
+            }
+        }
+
+        class ChestSymbol extends Symbol {
+            constructor(ctx) {
+                super(ctx);
+                this.fillStyle = "brown";
+            }
+        }
+
+        class CoinSymbol extends Symbol {
+            constructor(ctx) {
+                super(ctx);
+                this.fillStyle = "yellow";
+                this.textFillStyle = "brown";
+            }
+        }
+
+        class Coin extends CoinSymbol {
+            constructor(ctx, value, chest) {
+                super(ctx);
+                this.isClickable = true;
+                this.value = value;
+                this.chest = chest;
+                this.text = "" + this.value;
+            }
+
+            click(x, y, e) {
+                super.click(x, y, e);
+                this.grab();
+            }
+
+            grab() {
+                this.removeFromParent();
+                this.chest.removeCoin();
+            }
+        }
+
+        // Regresa un numero aleatorio entre 0 (inclusive) y max (exclusivo).
+        function getRandomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+
+        class Chest extends Rectangle {
+            constructor(ctx, game) {
+                super(ctx, chestInnerW * 3, chestInnerH * 3);
+
+                this.game = game;
+                this.parent = game;
+                var thisChest = this;
+
+                var innerRect = new HittableRect(ctx, chestInnerW, chestInnerH);
+                innerRect.setIdAndAddToParent("innerRect", this);
+                innerRect.x = chestInnerW;
+                innerRect.y = chestInnerH;
+                this.innerRect = innerRect;
+
+                var time = new TimeLabel(ctx, chestDefaultSeconds * fps, chestInnerW, chestInnerH / 2);
+                time.setIdAndAddToParent("time", this);
+                time.x = chestInnerW;
+                time.y = 0;
+
+                time.onFinish = function() {
+                    thisChest.setNextChest();
+                };
+
+                this.time = time;
+
+                var life = new LifeLabel(ctx, chestDefaultLife, chestInnerW, chestInnerH / 2);
+                life.setIdAndAddToParent("life", this);
+                life.x = chestInnerW;
+                life.y = chestInnerH / 2;
+                this.life = life;
+
+                this.alpha = 0;
+                this.isClickable = true;
+
+                innerRect.onClick = function(x, y, e) {
+                    life.reduce();
+                };
+
+                life.onFinish = function() {
+                    thisChest.changeToCoins();
+                };
+            }
+
+            changeToCoins() {
+                this.life.removeFromParent();
+                this.innerRect.removeFromParent();
+
+                const coinsMinAmt = 2;
+                const coinsMaxExtra = 2;
+                var coinsAmt = coinsMinAmt + getRandomInt(coinsMaxExtra + 1);
+                this.coinsAmt = coinsAmt;
+                this.coins = {};
+
+                for (var i = 0; i < coinsAmt; ++i) {
+                    var coin = new Coin(ctx, 1, this);
+                    coin.setIdAndAddToParent("coin-" + i, this);
+                    var collides;
+
+                    do {
+                        collides = false;
+                        coin.x = getRandomInt(this.w - coin.w);
+                        coin.y = getRandomInt(this.h - coin.h - this.time.h) + this.time.h;
+
+                        for (var coinId in this.coins) {
+                            if (this.coins.hasOwnProperty(coinId)) {
+                                if (this.coins[coinId].collides(coin)) {
+                                    collides = true;
+                                    break;
+                                }
+                            }
+                        }
+                    } while (collides);
+
+                    this.coins[coin.id] = coin;
+                }
+            }
+
+            removeCoin() {
+                if (this.coinsAmt > 0) {
+                    this.coinsAmt--;
+                    this.game.coins++;
+
+                    if (this.coinsAmt == 0) {
+                        this.setNextChest();
+                    }
+                }
+            }
+
+            setNextChest() {
+                this.removeFromParent();
+                this.game.tryAddChest();
+            }
+        }
+
+        function makeId(length) {
+            let result = '';
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            const charactersLength = characters.length;
+            let counter = 0;
+            while (counter < length) {
+                result += characters.charAt(getRandomInt(charactersLength));
+                counter += 1;
+            }
+            return result;
+        }
+
+        const chestGameDefaultWidth = 640;
+        const chestGameDefaultHeight = 360;
+
+        class SymbolCounter extends Rectangle {
+            constructor(ctx, symbol) {
+                super(ctx, symbol.w, symbol.h);
+                symbol.setIdAndAddToParent("symbol", this);
+                this.symbol = symbol;
+                var label = new Label(ctx, 0, symbol.h);
+                label.setIdAndAddToParent("label", this);
+                label.x = symbol.w;
+                label.textFillStyle = "white";
+                this.label = label;
+            }
+        }
+
+        class CoinsCounter extends SymbolCounter {
+            constructor(ctx, game) {
+                super(ctx, new CoinSymbol(ctx));
+                this.game = game;
+            }
+
+            update() {
+                this.label.text = "" + this.game.coins;
+                super.update();
+            }
+        }
+
+        class ChestCounter extends SymbolCounter {
+            constructor(ctx, game) {
+                super(ctx, new ChestSymbol(ctx));
+                this.game = game;
+            }
+
+            update() {
+                this.label.text = "" + this.game.chests;
+                super.update();
+            }
+        }
+
+        class DiagnosticsHud extends Rectangle {
+            constructor(ctx, parent) {
+                super(ctx, parent.w, parent.h);
+
+                var clickX = new Label(ctx, 40, 15);
+                clickX.setIdAndAddToParent("clickX", this);
+                clickX.text = "x: "
+                clickX.x = 0;
+                clickX.y = 0;
+                this.clickX = clickX;
+
+                var clickY = new Label(ctx, 40, 15);
+                clickY.setIdAndAddToParent("clickY", this);
+                clickY.text = "y: "
+                clickY.x = 40;
+                clickY.y = 0;
+                this.clickY = clickY;
+
+                this.isClickable = true;
+                this.alpha = 0.0;
+            }
+
+            click(x, y, e) {
+                this.clickX.text = "x: " + x;
+                this.clickY.text = "y: " + y;
+            }
+        }
+
+        const chestsPerLevel = 10;
+        const diagnostics = false;
+        const chestsSecondsToGameSecondsRatio = 3 / 5;
+
+        class ChestGame extends Rectangle {
+            coins = 0;
+            chests = chestsPerLevel;
+
+            constructor(ctx) {
+                super(ctx, chestGameDefaultWidth, chestGameDefaultHeight);
+                
+                var timeSeconds = (chestDefaultSeconds * chestsSecondsToGameSecondsRatio) * this.chests;
+                var time = new TimeLabel(ctx, timeSeconds * fps, symbolSize * 3, symbolSize);
+                time.setIdAndAddToParent("time", this);
+                time.x = (0/3) * this.w;
+                this.time = time;
+
+                var chestCounter = new ChestCounter(ctx, this);
+                chestCounter.setIdAndAddToParent("chestCounter", this);
+                chestCounter.x = (1/3) * this.w;
+                this.chestCounter = chestCounter;
+
+                var coinsCounter = new CoinsCounter(ctx, this);
+                coinsCounter.setIdAndAddToParent("coinsCounter", this);
+                coinsCounter.x = (2/3) * this.w;
+
+                this.isClickable = true;
+
+                if (diagnostics) {
+                    var diagnostics = new DiagnosticsHud(ctx, this);
+                    diagnostics.setIdAndAddToParent("diagnostics", this);
+                }
+
+                this.tryAddChest();
+            }
+
+            tryAddChest() {
+                if (this.chests > 0) {
+                    var chest = new Chest(ctx, this);
+                    chest.setIdAndAddToParent("chest", this);
+                    chest.x = getRandomInt(chestGameDefaultWidth - chest.w);
+                    chest.y = getRandomInt(chestGameDefaultHeight - chest.h);
+                    this.chests--;
+
+                    if (this.chests == 0) {
+                        this.chestCounter.removeFromParent();
+                    }
+                } else {
+
+                }
+            }
+
+            draw() {
+                ctx.clearRect(0, 0, this.w, this.h);
+                super.draw();
+            }
+        }
+
+        const canvas = document.getElementById("game");
+        const ctx = canvas.getContext("2d");
+        var game = new ChestGame(ctx);
+        var clickEvents = [];
+
+        function getMousePos(evt) {
+            var rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+
+        function loop() {
+            var startMs = Date.now();
+            var clickEventsList = clickEvents;
+            clickEvents = [];
+
+            for (var i = 0; i < clickEventsList.length; ++i) {
+                var e = clickEventsList[i];
+                var pos = getMousePos(e);
+                game.click(pos.x, pos.y, e);
+            }
+
+            game.update();
+            game.draw();
+            var endMs = Date.now();
+            var ellapsed = endMs - startMs;
+            var wait = msPerFrame - ellapsed;
+            setTimeout(loop, wait < 0 ? 0 : wait);
+        }
+
+        canvas.addEventListener("click", function(e) {
+            clickEvents.push(e);
+        });
+
+        loop();
+    </script>
+</html>
